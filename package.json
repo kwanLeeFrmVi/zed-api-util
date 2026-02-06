@@ -1,8 +1,8 @@
 {
   "name": "zed-api-util",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
-  "description": "Interactive CRUD tool to manage Zed openai_compatible providers",
+  "description": "Interactive CLI tool to manage Zed openai_compatible providers with hierarchical menus and model search",
   "author": "Quan Le",
   "license": "MIT",
   "repository": {
@@ -30,12 +30,12 @@
     "zed-api": "./zed-api.ts"
   },
   "scripts": {
-    "prebuild": "bun install",
-    "build": "bun build zed-api.ts --compile --outfile zed-api",
-    "postbuild": "chmod +x zed-api && rm -rf node_modules"
+    "start": "bun run zed-api.ts",
+    "build": "bun build zed-api.ts --compile --target bun --outfile zed-api",
+    "dev": "bun run zed-api.ts"
   },
   "dependencies": {
-    "@clack/prompts": "^0.8.2",
+    "@clack/prompts": "^1.0.0",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
