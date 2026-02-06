@@ -140,14 +140,30 @@ function findBestOpenRouterModelMatch(
 
     let score = 0;
 
+    // Exact match - highest score
     if (mId === normalized) score += 1000;
+
+    // Suffix exact match - very high score
     if (mSuffix === suffix) score += 500;
+
+    // Substring match
     if (mId.includes(normalized) || normalized.includes(mId)) score += 150;
     if (mSuffix.includes(suffix) || suffix.includes(mSuffix)) score += 75;
 
     // Token overlap to catch close-but-not-identical names.
     const overlap = jaccard(tokens, tokenizeId(m.id));
     score += overlap * 100;
+
+    // Enhanced: Check if core model tokens match (e.g., "glm", "4", "7")
+    // This helps match "zai-org/GLM-4.7-TEE" to "z-ai/glm-4.7"
+    const mTokens = tokenizeId(m.id);
+    const coreTokens = tokens.filter(t => t.length > 1 || /^\d+$/.test(t)); // Keep tokens >1 char or numbers
+    const mCoreTokens = mTokens.filter(t => t.length > 1 || /^\d+$/.test(t));
+
+    if (coreTokens.length > 0 && mCoreTokens.length > 0) {
+      const coreOverlap = jaccard(coreTokens, mCoreTokens);
+      score += coreOverlap * 150; // Higher weight for core token overlap
+    }
 
     // Bonus if the model name/slug contains the suffix.
     const name = (m.name || "").toLowerCase();
@@ -157,8 +173,9 @@ function findBestOpenRouterModelMatch(
     if (!best || score > best.score) best = { score, model: m };
   }
 
-  // Threshold to avoid wild mismatches.
-  if (!best || best.score < 250) return null;
+  // Lowered threshold to 150 for fuzzy matching (handles provider prefix differences)
+  // e.g., "zai-org/GLM-4.7-TEE" matches "z-ai/glm-4.7" via model name similarity
+  if (!best || best.score < 150) return null;
   return best.model;
 }
 
@@ -237,10 +254,16 @@ async function inferModelSettings(
   let capabilities = finalizeCapabilities(fromProvider, defaultCapabilities);
   let maxTokens = defaultMaxTokens;
 
-  // Cap max_tokens if provider advertises a max_completion_tokens.
-  const providerMax = providerModel?.top_provider?.max_completion_tokens;
-  if (typeof providerMax === "number" && providerMax > 0) {
-    maxTokens = Math.min(maxTokens, providerMax);
+  // Use context_length if provider advertises it (this is the total context window).
+  const providerContextLength = providerModel?.context_length;
+  if (typeof providerContextLength === "number" && providerContextLength > 0) {
+    maxTokens = providerContextLength;
+  }
+
+  // Fallback: Use top_provider.context_length if available.
+  const topProviderContextLength = providerModel?.top_provider?.context_length;
+  if (typeof topProviderContextLength === "number" && topProviderContextLength > 0 && !providerContextLength) {
+    maxTokens = topProviderContextLength;
   }
 
   const stillDefaulted =
@@ -267,9 +290,16 @@ async function inferModelSettings(
     };
     capabilities = finalizeCapabilities(fromOR, capabilities);
 
-    const orMax = match.top_provider?.max_completion_tokens;
-    if (typeof orMax === "number" && orMax > 0) {
-      maxTokens = Math.min(maxTokens, orMax);
+    // Use context_length from OpenRouter (this is the total context window).
+    const orContextLength = match.context_length;
+    if (typeof orContextLength === "number" && orContextLength > 0) {
+      maxTokens = orContextLength;
+    } else {
+      // Fallback to top_provider.context_length if available.
+      const orTopProviderContextLength = match.top_provider?.context_length;
+      if (typeof orTopProviderContextLength === "number" && orTopProviderContextLength > 0) {
+        maxTokens = orTopProviderContextLength;
+      }
     }
   } catch {
     // Ignore network / parsing errors and keep defaults.

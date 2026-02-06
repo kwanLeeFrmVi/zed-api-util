@@ -1,6 +1,6 @@
 {
   "name": "zed-api-util",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "Interactive CLI tool to manage Zed openai_compatible providers with hierarchical menus and model search",
   "author": "Quan Le",
