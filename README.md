@@ -1,6 +1,20 @@
 # Zed API Provider Manager
 
-Interactive CRUD terminal tool to manage OpenAI-compatible API providers in Zed editor.
+Auto-discover and manage OpenAI-compatible AI providers (OpenRouter, Ollama, etc.) in Zed with an interactive terminal UI. No more manual JSON editing.
+
+## 🤔 Why This Tool?
+
+Zed lacks an easy way to add OpenAI-compatible APIs and doesn't auto-fetch models. This tool fixes both:
+
+| Task | Manual (Zed only) | With This Tool |
+|------|------------------|----------------|
+| Add provider | Edit JSON by hand, look up model IDs | Enter URL → auto-fetches all models |
+| Configure | Copy-paste with manual capabilities | Interactive multi-select |
+| Update/Delete | More JSON editing | Menu-driven, preserves formatting |
+
+**Saves 15-30 mins of JSON editing → 30 seconds in terminal.**
+
+> 📖 See [Zed's official LLM provider docs](https://zed-dev.translate.goog/docs/ai/llm-providers) for the manual configuration process this tool replaces.
 
 ## 🚀 Quick Run (Latest Version)
 
