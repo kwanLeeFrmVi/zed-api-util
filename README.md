@@ -1,4 +1,4 @@
-# Zed API Provider Manager
+# Zed AI Provider Wizard
 
 Auto-discover and manage OpenAI-compatible AI providers (OpenRouter, Ollama, etc.) in Zed with an interactive terminal UI. No more manual JSON editing.
 
