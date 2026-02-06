@@ -2,6 +2,14 @@
 
 Interactive CRUD terminal tool to manage OpenAI-compatible API providers in Zed editor.
 
+## 🚀 Quick Run (Latest Version)
+
+```bash
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
+```
+
+No installation needed! This command always fetches and runs the **latest version** from GitHub.
+
 ## Features
 
 - 🚀 **Interactive Menu System** - Full CRUD operations via terminal UI
@@ -18,30 +26,37 @@ Interactive CRUD terminal tool to manage OpenAI-compatible API providers in Zed 
 ### Run Directly from GitHub (No Installation!)
 
 ```bash
+# Always runs the latest version from the repository
 bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
 ```
 
 **Requirements:** [Bun](https://bun.sh/) must be installed on your system.
 
-**First run:** Downloads dependencies automatically (one-time setup).
+**What happens on first run:**
+- Downloads the latest code from GitHub
+- Installs dependencies automatically
+- Caches everything for faster subsequent runs
 
 **Benefits:**
 - ✅ No local installation or cloning required
-- ✅ Always runs the latest version from main branch
+- ✅ Always runs the **latest version** from main branch
 - ✅ Internet connection required only for first run
-- ✅ Subsequent runs use cached version
+- ✅ Subsequent runs use cached version for speed
 
-### Run Specific Version/Branch
+### Run Specific Version/Branch/Commit
 
 ```bash
-# Use specific branch
+# Run from a specific branch (e.g., develop)
 bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#develop
 
-# Use specific version tag
+# Run from a specific version tag (e.g., v1.0.0)
 bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#v1.0.0
 
-# Use specific commit
+# Run from a specific commit hash
 bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#abc1234
+
+# To always get the latest version, omit the # suffix:
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
 ```
 
 ## Alternative Installation Methods
@@ -281,8 +296,11 @@ Delete "Ollama" with 5 models? No
 
 **Want to update to latest version:**
 ```bash
-# Clear Bun's cache to force fresh download
-rm -rf ~/.bun/install/cache
+# Force Bun to download the latest version (clears cache)
+bunx --bun https://github.com/kwanLeeFrmVi/zed-api-util.git
+
+# Or manually clear Bun's cache
+rm -rf ~/.bun/install/cache/github.com/kwanLeeFrmVi/zed-api-util
 bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
 ```
 
