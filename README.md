@@ -13,24 +13,61 @@ Interactive CRUD terminal tool to manage OpenAI-compatible API providers in Zed 
 - 🔄 **Smart Merging** - Keeps existing model configurations during updates
 - 🔑 **Environment-based API Keys** - Secure key management via environment variables
 
-## Installation
+## Quick Start
+
+### Run Directly from GitHub (No Installation!)
+
+```bash
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
+```
+
+**Requirements:** [Bun](https://bun.sh/) must be installed on your system.
+
+**First run:** Downloads dependencies automatically (one-time setup).
+
+**Benefits:**
+- ✅ No local installation or cloning required
+- ✅ Always runs the latest version from main branch
+- ✅ Internet connection required only for first run
+- ✅ Subsequent runs use cached version
+
+### Run Specific Version/Branch
+
+```bash
+# Use specific branch
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#develop
+
+# Use specific version tag
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#v1.0.0
+
+# Use specific commit
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git#abc1234
+```
+
+## Alternative Installation Methods
+
+### Local Development
+
+**Clone and run directly:**
+```bash
+git clone https://github.com/kwanLeeFrmVi/zed-api-util.git
+cd zed-api-util
+./zed-api.ts
+```
+
+### Build Standalone Binary
 
 **Build the standalone executable:**
 ```bash
-cd /Users/quanle96/Documents/config/zed/api-util
+cd zed-api-util
 bun install
 bun run build
-```
-
-That's it! The bundled `zed-api` executable is ready to use.
-
-## Usage
-
-Run from the project directory:
-```bash
-cd /Users/quanle96/Documents/config/zed/api-util
 ./zed-api
 ```
+
+The bundled `zed-api` executable works offline after build.
+
+## Usage
 
 You'll see:
 ```
@@ -236,8 +273,42 @@ Delete "Ollama" with 5 models? No
 
 ## Troubleshooting
 
-### Command not found
-Not applicable - run from project directory with `./zed-api`
+### `bunx` from GitHub
+
+**First run is slow:**
+- Dependencies are downloaded and cached on first execution
+- Subsequent runs are much faster using the cached version
+
+**Want to update to latest version:**
+```bash
+# Clear Bun's cache to force fresh download
+rm -rf ~/.bun/install/cache
+bunx https://github.com/kwanLeeFrmVi/zed-api-util.git
+```
+
+**Offline usage:**
+- After first run, `bunx` uses cached version
+- To ensure offline availability, run once while online
+- For fully offline usage, clone the repo and use `./zed-api.ts`
+
+**Offline usage:**
+- After first run, `bunx` uses cached version
+- To ensure offline availability, run once while online
+- For fully offline usage, clone the repo and use `./zed-api.ts`
+
+**Bun not installed:**
+```bash
+# Install Bun (macOS/Linux)
+curl -fsSL https://bun.sh/install | bash
+
+# Or via Homebrew
+brew install oven-sh/bun/bun
+```
+
+### Local execution issues
+
+**Command not found (local builds):**
+Not applicable - run from project directory with `./zed-api` or `./zed-api.ts`
 
 ### Authentication errors
 ```bash
@@ -287,12 +358,12 @@ echo '{}' > ~/.config/zed/settings.json
 ### Project Structure
 ```
 api-util/
-├── zed-api.source   # Source TypeScript file
+├── zed-api.ts       # Source TypeScript file (with shebang)
 ├── zed-api          # Bundled standalone executable (gitignored)
 ├── package.json     # Dependencies and build script
-├── bun.lock        # Lock file
-├── .gitignore      # Excludes node_modules/ and zed-api
-└── README.md       # This file
+├── bun.lock         # Lock file
+├── .gitignore       # Excludes node_modules/ and zed-api
+└── README.md        # This file
 ```
 
 ### Dependencies
@@ -306,17 +377,21 @@ api-util/
 
 To rebuild the standalone executable:
 ```bash
-cd /Users/quanle96/Documents/config/zed/api-util
+cd zed-api-util
 bun install  # Only if dependencies changed
 bun run build
 ```
 
 ### Running Locally
 ```bash
-cd /Users/quanle96/Documents/config/zed/api-util
-./zed-api  # Uses bundled executable
-# or during development:
-bun run --bun zed-api.source
+# Run source file directly
+./zed-api.ts
+
+# Or during development with Bun
+bun run zed-api.ts
+
+# Or use the compiled binary (after building)
+./zed-api
 ```
 
 ## License

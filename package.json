@@ -3,6 +3,29 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Interactive CRUD tool to manage Zed openai_compatible providers",
+  "author": "Quan Le",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kwanLeeFrmVi/zed-api-util.git"
+  },
+  "homepage": "https://github.com/kwanLeeFrmVi/zed-api-util#readme",
+  "bugs": {
+    "url": "https://github.com/kwanLeeFrmVi/zed-api-util/issues"
+  },
+  "keywords": [
+    "zed",
+    "zed-editor",
+    "openai",
+    "api-provider",
+    "cli",
+    "interactive",
+    "configuration",
+    "openai-compatible"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "bin": {
     "zed-api": "./zed-api.ts"
   },

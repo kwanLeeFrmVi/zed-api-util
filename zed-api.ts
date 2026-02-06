@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -131,7 +132,7 @@ function writeZedSettings(text: string) {
   writeFileSync(ZED_SETTINGS_PATH, text, "utf-8");
 }
 
-async function upsertProvider() {
+async function addProvider() {
   // Prompt for provider name
   const providerName = await text({
     message: "Provider name:",
@@ -142,6 +143,17 @@ async function upsertProvider() {
   });
 
   if (typeof providerName === "symbol") {
+    return;
+  }
+
+  // Check if provider already exists
+  const { data: settings } = readZedSettings();
+  const existingProviders = settings?.language_models?.openai_compatible || {};
+
+  if (existingProviders[providerName as string]) {
+    console.log(
+      `\n⚠️  Provider "${providerName}" already exists. Use "Modify provider" to update it.\n`,
+    );
     return;
   }
 
@@ -231,9 +243,9 @@ async function upsertProvider() {
 
   console.log(`\n✓ Selected ${selectedModelIds.length} models`);
 
-  // Ask for default max_tokens for new models
+  // Ask for default max_tokens
   const maxTokensInput = await text({
-    message: "Default max_tokens for new models:",
+    message: "Default max_tokens for models:",
     placeholder: "8192",
     defaultValue: "8192",
     validate: (value) => {
@@ -248,44 +260,27 @@ async function upsertProvider() {
 
   const defaultMaxTokens = parseInt(maxTokensInput as string, 10) || 8192;
 
-  // Read existing settings
-  const { text: settingsText, data: settings } = readZedSettings();
-
-  // Get existing provider config (if any)
-  const existingProvider: Provider | undefined =
-    settings?.language_models?.openai_compatible?.[providerName as string];
-
-  const existingModelsMap = new Map<string, AvailableModel>();
-  if (existingProvider?.available_models) {
-    for (const model of existingProvider.available_models) {
-      existingModelsMap.set(model.name, model);
-    }
-  }
-
-  // Build new available_models array
-  const availableModels: AvailableModel[] = selectedModelIds.map((modelId) => {
-    const existing = existingModelsMap.get(modelId);
-    if (existing) {
-      return existing;
-    } else {
-      return {
-        name: modelId,
-        display_name: deriveDisplayName(modelId),
-        max_tokens: defaultMaxTokens,
-        capabilities: {
-          tools: true,
-          images: false,
-          parallel_tool_calls: false,
-          prompt_cache_key: false,
-        },
-      };
-    }
-  });
+  // Build available_models array
+  const availableModels: AvailableModel[] = selectedModelIds.map((modelId) => ({
+    name: modelId,
+    display_name: deriveDisplayName(modelId),
+    max_tokens: defaultMaxTokens,
+    capabilities: {
+      tools: true,
+      images: false,
+      parallel_tool_calls: false,
+      prompt_cache_key: false,
+    },
+  }));
 
   const newProvider: Provider = {
     api_url: normalizedApiUrl,
     available_models: availableModels,
   };
+
+  // Read settings again for writing
+  const { text: settingsText } = readZedSettings();
+  const settingsData = jsonc.parse(settingsText);
 
   // Update settings using jsonc-parser to preserve formatting
   const path = ["language_models", "openai_compatible", providerName as string];
@@ -293,7 +288,7 @@ async function upsertProvider() {
   // Ensure parent paths exist
   let updatedText = settingsText;
 
-  if (!settings.language_models) {
+  if (!settingsData.language_models) {
     updatedText = jsonc.applyEdits(
       updatedText,
       jsonc.modify(
@@ -342,6 +337,165 @@ async function upsertProvider() {
   }
 }
 
+async function addModelsToProvider(providerName: string) {
+  const { text: settingsText, data: settings } = readZedSettings();
+  const providers = settings?.language_models?.openai_compatible || {};
+  const provider = providers[providerName];
+
+  if (!provider) {
+    console.log(`\n⚠️  Provider "${providerName}" not found\n`);
+    return;
+  }
+
+  // Get existing models
+  const existingModels = provider.available_models || [];
+  const existingModelNames = new Set<string>(
+    existingModels.map((m: AvailableModel) => m.name),
+  );
+
+  // Fetch models from API
+  const modelsEndpoint = getModelsEndpoint(provider.api_url);
+  const envVarName = deriveEnvVarName(providerName);
+  const apiKey = process.env[envVarName];
+
+  const fetchedModels = await fetchModels(modelsEndpoint, apiKey);
+  console.log(`\n✓ Found ${fetchedModels.length} models from API\n`);
+
+  // Create options with existing models pre-selected
+  const choices = fetchedModels.map((m) => ({
+    value: m.id,
+    label: m.id,
+    hint: existingModelNames.has(m.id)
+      ? "✓ Currently active"
+      : deriveDisplayName(m.id),
+  }));
+
+  // Pre-select existing models
+  const initialSelected = fetchedModels
+    .filter((m) => existingModelNames.has(m.id))
+    .map((m) => m.id);
+
+  const selected = await multiselect({
+    message:
+      "Select models (existing models are pre-selected, space to toggle):",
+    options: choices,
+    initialValues: initialSelected,
+  });
+
+  if (typeof selected === "symbol") {
+    return;
+  }
+
+  const selectedModelIds = selected as string[];
+  const selectedSet = new Set(selectedModelIds);
+
+  // Calculate changes
+  const additions = selectedModelIds.filter(
+    (id) => !existingModelNames.has(id),
+  );
+  const removals = Array.from(existingModelNames).filter(
+    (id: string) => !selectedSet.has(id),
+  );
+
+  // Check if no changes
+  if (additions.length === 0 && removals.length === 0) {
+    console.log("\n⚠️  No changes made\n");
+    return;
+  }
+
+  // Show confirmation
+  console.log("\n📝 Changes:");
+  if (additions.length > 0) {
+    console.log(`\n  ➕ Adding ${additions.length} model(s):`);
+    additions.forEach((id) => console.log(`     - ${id}`));
+  }
+  if (removals.length > 0) {
+    console.log(`\n  ➖ Removing ${removals.length} model(s):`);
+    removals.forEach((id) => console.log(`     - ${id}`));
+  }
+  console.log("");
+
+  const confirmed = await confirm({
+    message: "Apply these changes?",
+    initialValue: true,
+  });
+
+  if (typeof confirmed === "symbol" || !confirmed) {
+    console.log("\n❌ Changes cancelled\n");
+    return;
+  }
+
+  // Ask for default max_tokens for new models (only if adding)
+  let defaultMaxTokens = 8192;
+  if (additions.length > 0) {
+    const maxTokensInput = await text({
+      message: "Default max_tokens for new models:",
+      placeholder: "8192",
+      defaultValue: "8192",
+      validate: (value) => {
+        const num = parseInt(value, 10);
+        if (isNaN(num) || num <= 0) return "Must be a positive number";
+      },
+    });
+
+    if (typeof maxTokensInput === "symbol") {
+      return;
+    }
+
+    defaultMaxTokens = parseInt(maxTokensInput as string, 10) || 8192;
+  }
+
+  // Build new available_models array
+  const existingModelsMap = new Map<string, AvailableModel>();
+  for (const model of existingModels) {
+    existingModelsMap.set(model.name, model);
+  }
+
+  const availableModels: AvailableModel[] = selectedModelIds.map((modelId) => {
+    const existing = existingModelsMap.get(modelId);
+    if (existing) {
+      // Preserve settings for existing models
+      return existing;
+    } else {
+      // Create new model with default settings
+      return {
+        name: modelId,
+        display_name: deriveDisplayName(modelId),
+        max_tokens: defaultMaxTokens,
+        capabilities: {
+          tools: true,
+          images: false,
+          parallel_tool_calls: false,
+          prompt_cache_key: false,
+        },
+      };
+    }
+  });
+
+  // Update settings
+  const path = [
+    "language_models",
+    "openai_compatible",
+    providerName,
+    "available_models",
+  ];
+  const edits = jsonc.modify(settingsText, path, availableModels, {
+    formattingOptions: { insertSpaces: true, tabSize: 2 },
+  });
+
+  const updatedText = jsonc.applyEdits(settingsText, edits);
+  writeZedSettings(updatedText);
+
+  console.log(`\n✅ Successfully updated provider "${providerName}"`);
+  if (additions.length > 0) {
+    console.log(`   ➕ Added ${additions.length} model(s)`);
+  }
+  if (removals.length > 0) {
+    console.log(`   ➖ Removed ${removals.length} model(s)`);
+  }
+  console.log("");
+}
+
 async function listProviders() {
   const { data: settings } = readZedSettings();
   const providers = settings?.language_models?.openai_compatible || {};
@@ -349,7 +503,7 @@ async function listProviders() {
 
   if (providerNames.length === 0) {
     console.log("\n📭 No providers configured\n");
-    console.log("💡 Use 'Create/Update provider' to add your first provider\n");
+    console.log("💡 Use 'Add provider' to add your first provider\n");
     return;
   }
 
@@ -367,7 +521,7 @@ async function listProviders() {
   console.log("\n" + "─".repeat(80) + "\n");
 }
 
-async function editModelSettings() {
+async function editModelSettings(providerName?: string) {
   const { text: settingsText, data: settings } = readZedSettings();
   const providers = settings?.language_models?.openai_compatible || {};
   const providerNames = Object.keys(providers);
@@ -377,21 +531,27 @@ async function editModelSettings() {
     return;
   }
 
-  // Step 1: Select provider
-  const providerName = await select({
-    message: "Select provider to edit:",
-    options: providerNames.map((name) => ({
-      value: name,
-      label: name,
-      hint: `${providers[name].available_models?.length || 0} models`,
-    })),
-  });
+  // Step 1: Select provider (skip if provided)
+  let selectedProvider = providerName;
 
-  if (typeof providerName === "symbol") {
-    return;
+  if (!selectedProvider) {
+    const result = await select({
+      message: "Select provider to edit:",
+      options: providerNames.map((name) => ({
+        value: name,
+        label: name,
+        hint: `${providers[name].available_models?.length || 0} models`,
+      })),
+    });
+
+    if (typeof result === "symbol") {
+      return;
+    }
+
+    selectedProvider = result as string;
   }
 
-  const provider = providers[providerName as string];
+  const provider = providers[selectedProvider];
   const models = provider.available_models || [];
 
   if (models.length === 0) {
@@ -463,7 +623,7 @@ async function editModelSettings() {
       const path = [
         "language_models",
         "openai_compatible",
-        providerName as string,
+        selectedProvider,
         "available_models",
         modelIndex,
         "max_tokens",
@@ -500,7 +660,7 @@ async function editModelSettings() {
       const path = [
         "language_models",
         "openai_compatible",
-        providerName as string,
+        selectedProvider,
         "available_models",
         modelIndex,
         "capabilities",
@@ -521,7 +681,7 @@ async function editModelSettings() {
   writeZedSettings(updatedText);
 }
 
-async function deleteProvider() {
+async function deleteProvider(providerName?: string) {
   const { text: settingsText, data: settings } = readZedSettings();
   const providers = settings?.language_models?.openai_compatible || {};
   const providerNames = Object.keys(providers);
@@ -531,9 +691,117 @@ async function deleteProvider() {
     return;
   }
 
+  // Step 1: Select provider (skip if provided)
+  let selectedProvider = providerName;
+
+  if (!selectedProvider) {
+    const result = await select({
+      message: "Select provider to delete:",
+      options: providerNames.map((name) => ({
+        value: name,
+        label: name,
+        hint: `${providers[name].available_models?.length || 0} models`,
+      })),
+    });
+
+    if (typeof result === "symbol") {
+      return;
+    }
+
+    selectedProvider = result as string;
+  }
+
+  const provider = providers[selectedProvider];
+  const modelCount = provider.available_models?.length || 0;
+
+  // Step 2: Confirm deletion
+  const confirmed = await confirm({
+    message: `Delete provider "${selectedProvider}" with ${modelCount} model(s)?`,
+    initialValue: false,
+  });
+
+  if (typeof confirmed === "symbol" || !confirmed) {
+    console.log("\n❌ Deletion cancelled\n");
+    return;
+  }
+
+  // Step 3: Delete using jsonc-parser
+  const path = ["language_models", "openai_compatible", selectedProvider];
+  const edits = jsonc.modify(settingsText, path, undefined, {
+    formattingOptions: { insertSpaces: true, tabSize: 2 },
+  });
+
+  const updatedText = jsonc.applyEdits(settingsText, edits);
+  writeZedSettings(updatedText);
+
+  console.log(`\n✅ Successfully deleted provider "${selectedProvider}"\n`);
+}
+
+async function renameProvider(oldName: string) {
+  const { text: settingsText, data: settings } = readZedSettings();
+  const providers = settings?.language_models?.openai_compatible || {};
+
+  // Prompt for new name
+  const newName = await text({
+    message: "New provider name:",
+    placeholder: oldName,
+    validate: (value) => {
+      if (!value) return "Provider name is required";
+      if (value === oldName) return "Name unchanged";
+      if (providers[value]) return "Provider name already exists";
+    },
+  });
+
+  if (typeof newName === "symbol") {
+    return;
+  }
+
+  // Confirm rename
+  const confirmed = await confirm({
+    message: `Rename "${oldName}" to "${newName}"?`,
+    initialValue: true,
+  });
+
+  if (typeof confirmed === "symbol" || !confirmed) {
+    console.log("\n❌ Rename cancelled\n");
+    return;
+  }
+
+  // Copy to new key
+  const path = ["language_models", "openai_compatible", newName as string];
+  let updatedText = jsonc.applyEdits(
+    settingsText,
+    jsonc.modify(settingsText, path, providers[oldName], {
+      formattingOptions: { insertSpaces: true, tabSize: 2 },
+    }),
+  );
+
+  // Delete old key
+  const deletePath = ["language_models", "openai_compatible", oldName];
+  updatedText = jsonc.applyEdits(
+    updatedText,
+    jsonc.modify(updatedText, deletePath, undefined, {
+      formattingOptions: { insertSpaces: true, tabSize: 2 },
+    }),
+  );
+
+  writeZedSettings(updatedText);
+  console.log(`\n✅ Successfully renamed "${oldName}" to "${newName}"\n`);
+}
+
+async function modifyProviderMenu() {
+  const { data: settings } = readZedSettings();
+  const providers = settings?.language_models?.openai_compatible || {};
+  const providerNames = Object.keys(providers);
+
+  if (providerNames.length === 0) {
+    console.log("\n⚠️  No providers configured.\n");
+    return;
+  }
+
   // Step 1: Select provider
   const providerName = await select({
-    message: "Select provider to delete:",
+    message: "Select provider to modify:",
     options: providerNames.map((name) => ({
       value: name,
       label: name,
@@ -545,30 +813,46 @@ async function deleteProvider() {
     return;
   }
 
-  const provider = providers[providerName as string];
-  const modelCount = provider.available_models?.length || 0;
+  // Step 2: Show sub-menu
+  while (true) {
+    console.log("");
+    const action = await select({
+      message: `Modify "${providerName}" - Select action:`,
+      options: [
+        { value: "add-models", label: "Add/Remove models" },
+        { value: "modify-models", label: "Modify model settings" },
+        { value: "rename", label: "Rename provider" },
+        { value: "delete", label: "Delete provider" },
+        { value: "back", label: "Back to main menu" },
+      ],
+    });
 
-  // Step 2: Confirm deletion
-  const confirmed = await confirm({
-    message: `Delete provider "${providerName}" with ${modelCount} model(s)?`,
-    initialValue: false,
-  });
+    if (typeof action === "symbol" || action === "back") {
+      break;
+    }
 
-  if (typeof confirmed === "symbol" || !confirmed) {
-    console.log("\n❌ Deletion cancelled\n");
-    return;
+    switch (action) {
+      case "add-models":
+        await addModelsToProvider(providerName as string);
+        break;
+      case "modify-models":
+        await editModelSettings(providerName as string);
+        break;
+      case "rename":
+        await renameProvider(providerName as string);
+        // If renamed, exit sub-menu since provider name changed
+        break;
+      case "delete":
+        await deleteProvider(providerName as string);
+        // If deleted, exit sub-menu
+        break;
+    }
+
+    // Exit sub-menu after rename or delete
+    if (action === "rename" || action === "delete") {
+      break;
+    }
   }
-
-  // Step 3: Delete using jsonc-parser
-  const path = ["language_models", "openai_compatible", providerName as string];
-  const edits = jsonc.modify(settingsText, path, undefined, {
-    formattingOptions: { insertSpaces: true, tabSize: 2 },
-  });
-
-  const updatedText = jsonc.applyEdits(settingsText, edits);
-  writeZedSettings(updatedText);
-
-  console.log(`\n✅ Successfully deleted provider "${providerName}"\n`);
 }
 
 async function mainMenu() {
@@ -577,10 +861,9 @@ async function mainMenu() {
     const action = await select({
       message: "What would you like to do?",
       options: [
-        { value: "upsert", label: "Create/Update provider" },
+        { value: "add", label: "Add provider" },
+        { value: "modify", label: "Modify provider" },
         { value: "list", label: "List all providers" },
-        { value: "edit", label: "Edit model settings" },
-        { value: "delete", label: "Delete provider" },
         { value: "exit", label: "Exit" },
       ],
     });
@@ -591,17 +874,14 @@ async function mainMenu() {
     }
 
     switch (action) {
-      case "upsert":
-        await upsertProvider();
+      case "add":
+        await addProvider();
+        break;
+      case "modify":
+        await modifyProviderMenu();
         break;
       case "list":
         await listProviders();
-        break;
-      case "edit":
-        await editModelSettings();
-        break;
-      case "delete":
-        await deleteProvider();
         break;
     }
   }
