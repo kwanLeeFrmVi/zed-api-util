@@ -2,7 +2,16 @@ import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import * as jsonc from "jsonc-parser";
-import { confirm, select, multiselect, text, spinner, note, intro, outro } from "@clack/prompts";
+import {
+  confirm,
+  select,
+  multiselect,
+  text,
+  spinner,
+  note,
+  intro,
+  outro,
+} from "@clack/prompts";
 
 interface Model {
   id: string;
@@ -54,7 +63,7 @@ function deriveDisplayName(modelId: string): string {
 
 async function fetchModels(
   endpoint: string,
-  apiKey?: string
+  apiKey?: string,
 ): Promise<Model[]> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -77,7 +86,7 @@ async function fetchModels(
         console.error(
           `\n⚠️  Authentication required but no API key found.\n` +
             `Please set your API key in ~/.zshrc or ~/.bashrc:\n\n` +
-            `  export ${deriveEnvVarName("<PROVIDER_NAME>")}="your-api-key-here"\n`
+            `  export ${deriveEnvVarName("<PROVIDER_NAME>")}="your-api-key-here"\n`,
         );
         process.exit(1);
       }
@@ -164,9 +173,9 @@ async function upsertProvider() {
   if (!apiKey) {
     note(
       `Set your API key:\n\n` +
-      `  export ${envVarName}="your-api-key-here"\n\n` +
-      `Add this to ~/.zshrc or ~/.bashrc to persist.`,
-      "💡 Optional API Key"
+        `  export ${envVarName}="your-api-key-here"\n\n` +
+        `Add this to ~/.zshrc or ~/.bashrc to persist.`,
+      "💡 Optional API Key",
     );
   }
 
@@ -178,7 +187,10 @@ async function upsertProvider() {
   const selectionMode = await select({
     message: "How do you want to select models?",
     options: [
-      { value: "interactive", label: "Interactive selection (pick specific models)" },
+      {
+        value: "interactive",
+        label: "Interactive selection (pick specific models)",
+      },
       { value: "all", label: "Add all models" },
     ],
   });
@@ -284,9 +296,14 @@ async function upsertProvider() {
   if (!settings.language_models) {
     updatedText = jsonc.applyEdits(
       updatedText,
-      jsonc.modify(updatedText, ["language_models"], {}, {
-        formattingOptions: { insertSpaces: true, tabSize: 2 },
-      })
+      jsonc.modify(
+        updatedText,
+        ["language_models"],
+        {},
+        {
+          formattingOptions: { insertSpaces: true, tabSize: 2 },
+        },
+      ),
     );
   }
 
@@ -294,9 +311,14 @@ async function upsertProvider() {
   if (!settingsAfterLM.language_models.openai_compatible) {
     updatedText = jsonc.applyEdits(
       updatedText,
-      jsonc.modify(updatedText, ["language_models", "openai_compatible"], {}, {
-        formattingOptions: { insertSpaces: true, tabSize: 2 },
-      })
+      jsonc.modify(
+        updatedText,
+        ["language_models", "openai_compatible"],
+        {},
+        {
+          formattingOptions: { insertSpaces: true, tabSize: 2 },
+        },
+      ),
     );
   }
 
@@ -310,7 +332,9 @@ async function upsertProvider() {
   // Write back
   writeZedSettings(updatedText);
 
-  console.log(`\n✅ Successfully configured provider "${providerName}" with ${availableModels.length} models!`);
+  console.log(
+    `\n✅ Successfully configured provider "${providerName}" with ${availableModels.length} models!`,
+  );
 
   if (!apiKey) {
     console.log(`\n💡 To use this provider, add to your shell rc file:\n`);
@@ -356,7 +380,7 @@ async function editModelSettings() {
   // Step 1: Select provider
   const providerName = await select({
     message: "Select provider to edit:",
-    options: providerNames.map(name => ({
+    options: providerNames.map((name) => ({
       value: name,
       label: name,
       hint: `${providers[name].available_models?.length || 0} models`,
@@ -433,7 +457,9 @@ async function editModelSettings() {
     const tokenValue = parseInt(newMaxTokens as string, 10);
 
     for (const modelName of modelNames) {
-      const modelIndex = models.findIndex((m: AvailableModel) => m.name === modelName);
+      const modelIndex = models.findIndex(
+        (m: AvailableModel) => m.name === modelName,
+      );
       const path = [
         "language_models",
         "openai_compatible",
@@ -449,11 +475,14 @@ async function editModelSettings() {
       updatedText = jsonc.applyEdits(updatedText, edits);
     }
 
-    console.log(`\n✅ Updated max_tokens to ${tokenValue} for ${modelNames.length} model(s)\n`);
+    console.log(
+      `\n✅ Updated max_tokens to ${tokenValue} for ${modelNames.length} model(s)\n`,
+    );
   } else {
     // Capability toggle
-    const currentValue = models.find((m: AvailableModel) => m.name === modelNames[0])
-      ?.capabilities?.[editAction as keyof AvailableModel['capabilities']];
+    const currentValue = models.find(
+      (m: AvailableModel) => m.name === modelNames[0],
+    )?.capabilities?.[editAction as keyof AvailableModel["capabilities"]];
 
     const newValue = await confirm({
       message: `Enable ${editAction}?`,
@@ -465,7 +494,9 @@ async function editModelSettings() {
     }
 
     for (const modelName of modelNames) {
-      const modelIndex = models.findIndex((m: AvailableModel) => m.name === modelName);
+      const modelIndex = models.findIndex(
+        (m: AvailableModel) => m.name === modelName,
+      );
       const path = [
         "language_models",
         "openai_compatible",
@@ -482,7 +513,9 @@ async function editModelSettings() {
       updatedText = jsonc.applyEdits(updatedText, edits);
     }
 
-    console.log(`\n✅ Set ${editAction} to ${newValue} for ${modelNames.length} model(s)\n`);
+    console.log(
+      `\n✅ Set ${editAction} to ${newValue} for ${modelNames.length} model(s)\n`,
+    );
   }
 
   writeZedSettings(updatedText);
@@ -501,7 +534,7 @@ async function deleteProvider() {
   // Step 1: Select provider
   const providerName = await select({
     message: "Select provider to delete:",
-    options: providerNames.map(name => ({
+    options: providerNames.map((name) => ({
       value: name,
       label: name,
       hint: `${providers[name].available_models?.length || 0} models`,

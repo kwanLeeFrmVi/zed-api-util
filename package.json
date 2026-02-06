@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Interactive CRUD tool to manage Zed openai_compatible providers",
+  "bin": {
+    "zed-api": "./zed-api.ts"
+  },
   "scripts": {
     "prebuild": "bun install",
     "build": "bun build zed-api.ts --compile --outfile zed-api",
