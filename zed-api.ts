@@ -109,7 +109,7 @@ async function fetchModels(
       process.exit(1);
     }
 
-    return models;
+    return models.sort((a, b) => a.id.localeCompare(b.id));
   } catch (error) {
     s.stop("Failed to fetch models");
     console.error(`Error: ${error}`);
